@@ -1,0 +1,27 @@
+stocks = list(top_20_tickers.index)  # Just replace this with a list of stocks if needed
+combined_lst = stocks + ["^GSPC"]
+
+# compiles historical data for all stocks and puts them into one dataframe
+data = yf.download(combined_lst, start="2023-01-01", end="2024-01-01")['Close']
+# use "yf.download" because we're dealing with multiple tickers
+
+# calculate daily returns for each stock
+returns = data.pct_change().dropna()
+#print(returns)
+
+# Calculate tracking error for each stock
+tracking_errors = {}
+sp500_returns = returns["^GSPC"]
+
+for stock in stocks:
+    tracking_error = (returns[stock] - sp500_returns).std()
+    tracking_errors[stock] = tracking_error
+
+# create dataframe to store values
+tracking_error_df = pd.DataFrame.from_dict(tracking_errors, orient='index', columns=['Tracking Error'])
+tracking_error_df['Rank'] = tracking_error_df['Tracking Error'].rank()
+
+# sort by least tracking error
+tracking_error_df.sort_values(by='Rank', inplace=True)
+
+print(tracking_error_df)
