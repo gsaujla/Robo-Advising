@@ -1,1 +1,3 @@
 # Robo-Advising
+
+Our strategy is market meet. We first filtered out invalid tickers, such as delisted stocks, stocks that are not in North America, and stocks that have too little volume. Then we calculated the correlations to the market indices and the beta value of each stocks. (After considering a couple more parameters such as ...) Finally, to decides the weighting of stocks in our portfolio, we ranked the stocks based on parameters described previously and gave the highest weighting to the tickers that ranked the highest. Additionally, we experiemented with a few possible portfolios, checked their return rates against the market (for the past weeks? months? years?), and outputted the portfolio that most closely resembled the market. 
