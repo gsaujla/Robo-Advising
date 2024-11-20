@@ -1,0 +1,68 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from pypfopt import EfficientFrontier, risk_models, expected_returns, objective_functions
+
+# Define stock list and market index
+stock_list = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NFLX", "NVDA", "JPM", "BAC",
+              "WMT", "DIS", "PG", "KO", "XOM", "PFE", "CVX"]
+market_index = "^GSPC"  # S&P 500
+
+# Step 1: Fetch historical data
+start_date = "2023-01-01"
+end_date = "2023-12-31"
+data = yf.download(stock_list + [market_index], start=start_date, end=end_date)["Adj Close"]
+
+# Separate stock prices and market index prices
+stock_prices = data[stock_list]
+market_prices = data[market_index]
+
+# Step 2: Calculate beta and covariance
+returns = stock_prices.pct_change().dropna()
+market_returns = market_prices.pct_change().dropna()
+
+# Calculate betas
+betas = {}
+for stock in stock_list:
+    cov = np.cov(returns[stock], market_returns)[0][1]
+    var = np.var(market_returns)
+    betas[stock] = cov / var
+
+# Select stocks with beta close to 1
+beta_target = 1
+selected_stocks = sorted(betas.keys(), key=lambda x: abs(betas[x] - beta_target))[:15]
+
+# Step 3: Prepare for portfolio optimization
+selected_prices = stock_prices[selected_stocks]
+mu = expected_returns.mean_historical_return(selected_prices)
+S = risk_models.sample_cov(selected_prices)
+
+# Optimize portfolio
+ef = EfficientFrontier(mu, S)
+ef.add_objective(objective_functions.L2_reg, gamma=0.1)  # Add L2 regularization
+ef.add_transaction_costs(selected_prices.iloc[-1], 0.01)  # 1% transaction cost
+weights = ef.efficient_return(target_return=market_returns.mean())
+cleaned_weights = ef.clean_weights()
+
+# Step 4: Allocate funds
+total_money = 10000
+final_allocation = {}
+for stock, weight in cleaned_weights.items():
+    if weight > 0:
+        allocation = total_money * weight
+        price = selected_prices.iloc[-1][stock]
+        num_shares = np.floor(allocation / price)
+        total_cost = num_shares * price
+        transaction_cost = total_cost * 0.01
+        final_allocation[stock] = {
+            "num_shares": num_shares,
+            "allocated_money": total_cost + transaction_cost,
+            "transaction_cost": transaction_cost
+        }
+
+# Print final allocation
+print("Final Portfolio Allocation:")
+for stock, allocation in final_allocation.items():
+    print(f"{stock}: {allocation['num_shares']} shares, ${allocation['allocated_money']:.2f}")
+
+print(f"Total Money Spent: ${sum(a['allocated_money'] for a in final_allocation.values()):.2f}")
